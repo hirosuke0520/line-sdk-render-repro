@@ -10,5 +10,11 @@ services:
         sync: false
       - key: LINE_CHANNEL_ACCESS_TOKEN
         sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-haiku-4-5-20251001
       - key: REPLY_TO_LINE
         value: "0"
+      - key: REPLY_KEYWORD
+        value: "エンジニア"
