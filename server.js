@@ -6,6 +6,7 @@ const port = Number(process.env.PORT || 10000);
 const channelSecret = process.env.LINE_CHANNEL_SECRET || "";
 const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN || "";
 const shouldReply = process.env.REPLY_TO_LINE === "1";
+const replyKeyword = (process.env.REPLY_KEYWORD || "").trim();
 const requests = [];
 
 const lineConfig = {
@@ -86,6 +87,16 @@ async function handleEvents(events) {
       continue;
     }
 
+    const text = String(event.message.text || "").trim();
+    if (replyKeyword && !text.includes(replyKeyword)) {
+      results.push({
+        replySkipped: true,
+        reason: "keyword_mismatch",
+        replyKeyword,
+      });
+      continue;
+    }
+
     if (!lineClient || !event.replyToken) {
       results.push({ replySkipped: true, reason: "missing_client_or_reply_token" });
       continue;
@@ -93,7 +104,7 @@ async function handleEvents(events) {
 
     await lineClient.replyMessage({
       replyToken: event.replyToken,
-      messages: [{ type: "text", text: `SDK repro received: ${event.message.text}` }],
+      messages: [{ type: "text", text: `SDK repro received: ${text}` }],
     });
     results.push({ replied: true });
   }
@@ -107,7 +118,12 @@ function sendJson(res, status, payload) {
 const app = express();
 
 app.get("/healthz", (_req, res) => {
-  sendJson(res, 200, { ok: true, service: "line-sdk-render-repro" });
+  sendJson(res, 200, {
+    ok: true,
+    service: "line-sdk-render-repro",
+    shouldReply,
+    replyKeyword: replyKeyword || null,
+  });
 });
 
 app.get("/last", (_req, res) => {

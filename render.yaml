@@ -12,3 +12,5 @@ services:
         sync: false
       - key: REPLY_TO_LINE
         value: "0"
+      - key: REPLY_KEYWORD
+        value: "エンジニア"
