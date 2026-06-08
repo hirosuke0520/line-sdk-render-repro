@@ -58,6 +58,10 @@ function verifySignature(rawBody, signature) {
   );
 }
 
+function sha256(value) {
+  return crypto.createHash("sha256").update(value, "utf8").digest("hex");
+}
+
 function summarizeEvents(events) {
   return events.map((event) => ({
     type: event.type,
@@ -139,6 +143,8 @@ app.post(
 
     remember("raw", req, {
       validSignature: valid,
+      rawBodySha256: sha256(rawBody),
+      signatureSha256: signature ? sha256(signature) : null,
       events: summarizeEvents(events),
     });
 
