@@ -7,6 +7,7 @@ const channelSecret = process.env.LINE_CHANNEL_SECRET || "";
 const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN || "";
 const shouldReply = process.env.REPLY_TO_LINE === "1";
 const replyKeyword = (process.env.REPLY_KEYWORD || "").trim();
+const anthropicModel = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
 const requests = [];
 
 const lineConfig = {
@@ -74,6 +75,44 @@ function summarizeEvents(events) {
   }));
 }
 
+async function createReply(text) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: anthropicModel,
+      max_tokens: 260,
+      temperature: 0.4,
+      system:
+        "あなたはIT系の相談に短く乗るアシスタントです。返信は必ず日本語200文字以内。LINEで返信するため、マークダウンは使わずプレーンテキストにしてください。絵文字は使わないでください。適宜改行を使って読みやすくしてください。前置きなし。断定しすぎず、次の一手が分かる実務的な返答にしてください。",
+      messages: [
+        {
+          role: "user",
+          content: text,
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Claude API failed: ${response.status} ${body.slice(0, 200)}`);
+  }
+
+  const data = await response.json();
+  const answer =
+    data.content?.find((item) => item.type === "text")?.text?.trim() ||
+    "状況を整理して、目的・現状・困っている点を一つずつ確認しましょう。";
+  return answer.slice(0, 200);
+}
+
 async function handleEvents(events) {
   const results = [];
   for (const event of events) {
@@ -102,11 +141,12 @@ async function handleEvents(events) {
       continue;
     }
 
+    const reply = await createReply(text);
     await lineClient.replyMessage({
       replyToken: event.replyToken,
-      messages: [{ type: "text", text: `SDK repro received: ${text}` }],
+      messages: [{ type: "text", text: reply }],
     });
-    results.push({ replied: true });
+    results.push({ replied: true, replyLength: reply.length });
   }
   return results;
 }
@@ -123,6 +163,7 @@ app.get("/healthz", (_req, res) => {
     service: "line-sdk-render-repro",
     shouldReply,
     replyKeyword: replyKeyword || null,
+    anthropicModel,
   });
 });
 
